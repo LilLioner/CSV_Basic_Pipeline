@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 from pathlib import Path
 
 raw = Path("data/raw")
@@ -19,7 +18,7 @@ mapa_colunas =  {
 obg_column = [
   'id', 'valor_produto', 'quantidade'
 ]
-
+schema_columns = ['id', 'cliente', 'valor_produto', 'quantidade', 'cidade']
 
 def padronizar_colunas(df, mapa):
     #padronização de texto
@@ -41,16 +40,20 @@ def padronizar_colunas(df, mapa):
 
 
 def validar_colunas(df):
+    #se uma das colunas obrigatorias nao estiver no arquivo, retornar ValueError
     mssg_clm = [col for col in obg_column if col not in df.columns]
     if mssg_clm:
       raise ValueError(f"Colunas Faltando: {mssg_clm}")
 
 
 def limpeza(df):
-   df = df.dropna(subset=obg_column)
+   df = df.dropna(subset=obg_column)  
    df = df.drop_duplicates(subset='id', keep='first')
-   df['cliente'] = df['cliente'].fillna("desconhecido")
-   df['cidade'] = df['cidade'].fillna("desconhecido")
+   colunas = ['cliente', 'cidade']
+   df[colunas] = df[colunas].fillna("desconhecido")
+   df['produto'] = df['produto'].fillna("nao_informado")
+   colunas = ['cliente', 'cidade', 'produto']
+   df[colunas] = df[colunas].apply(lambda x: x.str.strip().str.lower())
    return df
 
 
@@ -59,9 +62,22 @@ def limpeza(df):
 
 
 for i in csv_raw:
-  df = pd.read_csv(i)
-  df = padronizar_colunas(df, mapa_colunas)
-  df = limpeza(df)
-  print(df.info())
-          
+  try:
+    df = pd.read_csv(i)
+    df = padronizar_colunas(df, mapa_colunas)
+    validar_colunas(df)
+    df = limpeza(df)
+    df['valor_total'] = df['valor_produto'] * df['quantidade']
+    limpos.append(i)
+
+    print(f"Arquivo {i} OK!")
+    print(df)
+  except ValueError as e:
+    print(f"Arquivo {i} foi Rejeitado: {e}")
+    errors.append({
+       "arquivo" : i,
+       "erro": str(e)
+    })
+
+    continue
 
