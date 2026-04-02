@@ -4,21 +4,24 @@ from pathlib import Path
 raw = Path("data/raw")
 psd = Path("data/processed")
 psd.mkdir(exist_ok=True)
-csv_raw = raw.glob("*.csv")
+csv_raw = raw.glob('*.csv')
     
 limpos = []
 errors = []
+
+#A Dict abaixo é uma lista de nomes parecidos com os nomes requeridos pelo script
 mapa_colunas =  {
   'id' : ["id", "id_compra", "compra_id", "id_pedido", "pedido_id"],
-  'cliente' : ["nome", "nome_cliente", "cliente_nome"],
-  'valor_produto' : ["preço", "preco", "valor_compra", "valor", "preco_unitario"],
-  'quantidade' : ["qtd", "unidades", "quantia"],
-  'cidade' : ["loja", "região", "regiao", "local"]
+  'cliente' : ["nome", "nome_cliente", "cliente_nome", "customer"],
+  'valor_produto' : ["preço", "preco", "valor_compra", "valor", "preco_unitario", "price"],
+  'quantidade' : ["qtd", "unidades", "quantia", "quantity"],
+  'cidade' : ["loja", "região", "regiao", "local", "city"],
+  'produto' : ["Item", "product"]
 }
 obg_column = [
   'id', 'valor_produto', 'quantidade'
 ]
-schema_columns = ['id', 'cliente', 'valor_produto', 'quantidade', 'cidade']
+schema_columns = ['id', 'cliente', 'valor_produto', 'quantidade', 'cidade', 'produto']
 
 def padronizar_colunas(df, mapa):
     #padronização de texto
@@ -36,6 +39,7 @@ def padronizar_colunas(df, mapa):
         if col in variacoes:
           colunas_novas[col] = col_padrao
     df = df.rename(columns=colunas_novas)
+    df = df[schema_columns] 
     return df
 
 
@@ -47,33 +51,39 @@ def validar_colunas(df):
 
 
 def limpeza(df):
+   
+   #filtro de linhas para garantir que valores invalidos ou erros de digitção sejam excluidos
+   df = df.query('not (quantidade <= 0 or valor_produto <= 0 or valor_produto > 10000)') 
+
+   #Exclusão de valores obrigatorios nulos e linhas de id duplicados
    df = df.dropna(subset=obg_column)  
    df = df.drop_duplicates(subset='id', keep='first')
+
+   #Preenchimento de linhas com valores nao obrigatorios
    colunas = ['cliente', 'cidade']
    df[colunas] = df[colunas].fillna("desconhecido")
    df['produto'] = df['produto'].fillna("nao_informado")
+
+   #Padronização de texto para colunas de texto
    colunas = ['cliente', 'cidade', 'produto']
    df[colunas] = df[colunas].apply(lambda x: x.str.strip().str.lower())
+   df['valor_total'] = df['valor_produto'] * df['quantidade']
+   df = df.sort_values(by='valor_total', ascending=False)
    return df
-
-
-
-
-
 
 for i in csv_raw:
   try:
-    df = pd.read_csv(i)
+    df = pd.read_csv(i, encoding='UTF-8', low_memory=False)
     df = padronizar_colunas(df, mapa_colunas)
     validar_colunas(df)
     df = limpeza(df)
-    df['valor_total'] = df['valor_produto'] * df['quantidade']
     limpos.append(i)
 
-    print(f"Arquivo {i} OK!")
-    print(df)
-  except ValueError as e:
-    print(f"Arquivo {i} foi Rejeitado: {e}")
+    clean_csv = f"{i.stem}_limpo{i.suffix}"
+    df.to_csv(psd / clean_csv, index=False)
+
+  except Exception as e:
+    print(f"Arquivo {i.name} foi Rejeitado: {e}")
     errors.append({
        "arquivo" : i,
        "erro": str(e)
@@ -81,3 +91,16 @@ for i in csv_raw:
 
     continue
 
+print("-" * 30)
+
+print(f"Arquivos Limpos com Êxito: {len(limpos)}")
+
+for i in limpos:
+   print(f" - {i.name} processado e salvo em /processed")
+
+print(f"\nArquivos Recusados: {len(errors)}")
+for erro_dict in errors:
+   file_error = erro_dict['arquivo'].name
+   error_name = erro_dict['erro']
+
+   print(f"Arquivo: {file_error} | Motivo : {error_name}")
