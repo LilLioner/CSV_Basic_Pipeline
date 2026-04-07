@@ -51,13 +51,24 @@ def validar_colunas(df):
 
 
 def limpeza(df):
-   
+   #Conversão de Valores
+   df_numerics = ['id', 'quantidade', 'valor_produto']
+   df_str = ['cliente', 'cidade', 'produto']
+
+   df[df_str] = df[df_str].astype(str)   
+   df[df_numerics] = df[df_numerics].apply(pd.to_numeric, errors = 'coerce')
+
    #filtro de linhas para garantir que valores invalidos ou erros de digitção sejam excluidos
    df = df.query('not (quantidade <= 0 or valor_produto <= 0 or valor_produto > 10000)') 
 
    #Exclusão de valores obrigatorios nulos e linhas de id duplicados
    df = df.dropna(subset=obg_column)  
    df = df.drop_duplicates(subset='id', keep='first')
+  
+   #Reconversão de valores numericos
+   df_int = ['id', 'quantidade']
+   df[df_int] = df[df_int].astype(int)
+   df['valor_produto'] = df['valor_produto'].astype(float)
 
    #Preenchimento de linhas com valores nao obrigatorios
    colunas = ['cliente', 'cidade']
@@ -78,7 +89,6 @@ for i in csv_raw:
     validar_colunas(df)
     df = limpeza(df)
     limpos.append(i)
-
     clean_csv = f"{i.stem}_limpo{i.suffix}"
     df.to_csv(psd / clean_csv, index=False)
 
