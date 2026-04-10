@@ -39,7 +39,11 @@ def padronizar_colunas(df, mapa):
         if col in variacoes:
           colunas_novas[col] = col_padrao
     df = df.rename(columns=colunas_novas)
-    df = df[schema_columns] 
+    
+    for col in schema_columns:
+      if col not in df.columns:
+        df[col] = "Desconhecido" 
+    df = df[schema_columns]
     return df
 
 
